@@ -1,0 +1,89 @@
+#cloud-config
+
+# System update and package installation
+package_update: true
+package_upgrade: true
+packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - software-properties-common
+  - gnupg
+  - lsb-release
+  - jq
+  - git
+  - zfsutils-linux
+  - nfs-kernel-server
+  - nfs-common
+  - helm
+
+# Create directories
+runcmd:
+  # Basic system setup
+  - echo "Setting up system basics..."
+  - hostnamectl set-hostname k8s-master
+
+  # ZFS setup (assuming datapool exists)
+  - echo "Setting up ZFS datasets..."
+  - zpool create -f datapool /dev/sdX || true
+  - zfs create -o mountpoint=/srv/nfs datapool/nfs || true
+  - zfs create -o mountpoint=/backup datapool/backup || true
+  - chown nobody:nogroup /srv/nfs
+  - chmod 777 /srv/nfs
+
+  # Configure NFS server
+  - echo "Configuring NFS server..."
+  - echo "/srv/nfs *(rw,sync,no_subtree_check,no_root_squash)" > /etc/exports
+  - systemctl restart nfs-kernel-server
+  - exportfs -a
+
+  # Install MicroK8s
+  - echo "Installing MicroK8s..."
+  - snap install microk8s --classic --channel=1.28/stable
+  - microk8s status --wait-ready
+  - usermod -a -G microk8s ubuntu
+  - mkdir -p /home/ubuntu/.kube
+  - microk8s.kubectl config view --raw > /home/ubuntu/.kube/config
+  - chown -R ubuntu:ubuntu /home/ubuntu/.kube
+  - microk8s.enable dns storage helm3
+
+  # Install NFS Provisioner
+  - echo "Installing NFS Provisioner..."
+  - microk8s.kubectl create namespace nfs-provisioner
+  - microk8s.helm repo add nfs-subdir-external-provisioner https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/
+  - microk8s.helm install nfs-subdir-external-provisioner nfs-subdir-external-provisioner/nfs-subdir-external-provisioner \
+    --set nfs.server=$(hostname -I | awk '{print $1}') \
+    --set nfs.path=/srv/nfs \
+    --set storageClass.name=nfs-client \
+    --set storageClass.defaultClass=true \
+    --namespace nfs-provisioner
+
+  # Install ArgoCD
+  - echo "Installing ArgoCD..."
+  - microk8s.kubectl create namespace argocd
+  - microk8s.kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+  - microk8s.kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "NodePort"}}'
+  - echo "Waiting for ArgoCD to be ready..."
+  - sleep 60
+
+  # Deploy sample application with ArgoCD
+  - echo "Creating an ArgoCD application for NGINX..."
+  - microk8s.kubectl apply -f https://raw.githubusercontent.com/mualij/literate-octo-robot/main/manifests/nginx-app.yaml -n argocd
+
+  # Clone the repository
+  - echo "Cloning repository with all configuration..."
+  - git clone https://github.com/mualij/literate-octo-robot.git /home/ubuntu/k8s-setup
+  - chown -R ubuntu:ubuntu /home/ubuntu/k8s-setup
+
+  # Set up the backup and restore scripts
+  - echo "Setting up backup and restore scripts..."
+  - cp /home/ubuntu/k8s-setup/setup/backup/*.sh /usr/local/bin/
+  - chmod +x /usr/local/bin/*.sh
+
+  # Create a welcome message
+  - echo "System setup completed!" > /home/ubuntu/SETUP_COMPLETE.txt
+  - echo "ArgoCD UI is available at https://$(hostname -I | awk '{print $1}'):$(microk8s.kubectl get svc argocd-server -n argocd -o jsonpath='{.spec.ports[0].nodePort}')" >> /home/ubuntu/SETUP_COMPLETE.txt
+  - echo "ArgoCD initial admin password can be retrieved with: microk8s.kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d" >> /home/ubuntu/SETUP_COMPLETE.txt
+  - chown ubuntu:ubuntu /home/ubuntu/SETUP_COMPLETE.txt
+
+final_message: "The system is fully configured and ready to use!"
