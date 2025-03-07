@@ -1,3 +1,4 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,6 +20,13 @@ spec:
         image: nginx:1.21
         ports:
         - containerPort: 80
+        volumeMounts:
+        - name: nginx-data
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: nginx-data
+        persistentVolumeClaim:
+          claimName: nginx-pvc
 ---
 apiVersion: v1
 kind: Service
@@ -31,3 +39,15 @@ spec:
   - port: 80
     targetPort: 80
   type: ClusterIP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nginx-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: nfs-client
