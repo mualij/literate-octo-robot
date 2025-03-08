@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/mustafa-judicial/literate-octo-robot.git
+    repoURL: https://github.com/mualij/literate-octo-robot.git
     targetRevision: HEAD
     path: manifests/homepage
   destination:

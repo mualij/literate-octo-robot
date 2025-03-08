@@ -6,12 +6,12 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/mustafa-judicial/literate-octo-robot.git
+    repoURL: https://github.com/mualij/literate-octo-robot.git
     targetRevision: HEAD
     path: manifests/ollama
   destination:
     server: https://kubernetes.default.svc
-    namespace: openwebui
+    namespace: ollama
   syncPolicy:
     automated:
       prune: true
