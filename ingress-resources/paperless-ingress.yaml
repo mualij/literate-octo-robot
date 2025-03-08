@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: paperless-ingress
+  namespace: paperless-ngx
+  annotations:
+    kubernetes.io/ingress.class: nginx
+spec:
+  rules:
+  - host: paperless.judicial.life
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: paperless-ngx-service
+            port:
+              number: 8000

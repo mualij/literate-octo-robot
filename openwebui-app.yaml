@@ -11,8 +11,10 @@ spec:
     path: manifests/openwebui
   destination:
     server: https://kubernetes.default.svc
-    namespace: default
+    namespace: open-webui
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
