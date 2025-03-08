@@ -11,7 +11,7 @@ spec:
     path: manifests/ollama
   destination:
     server: https://kubernetes.default.svc
-    namespace: ollama
+    namespace: openwebui
   syncPolicy:
     automated:
       prune: true
