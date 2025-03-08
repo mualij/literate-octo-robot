@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homepage-config
+  namespace: homepage
+data:
+  settings.yaml: |
+    ---
+    title: Judicial.life Dashboard
+    theme: dark
+    # Other appearance settings
+    favicon: auto
+    language: en
+    cardBlur: sm
+    layout:
+      sidebar:
+        enabled: true
+      search:
+        enabled: true
+        provider: duckduckgo
+      header:
+        enabled: true
+  services.yaml: |
+    ---
+    # First group for AI services
+    - group: AI Services
+      items:
+        - name: OpenWebUI
+          icon: mdi-chat-processing
+          href: https://openwebui.judicial.life
+          description: OpenWebUI chat interface for Ollama models
+          widget:
+            type: ping
+            url: https://openwebui.judicial.life
+
+    # Second group for document management and utilities
+    - group: Documents & Utilities
+      items:
+        - name: Paperless-NGX
+          icon: mdi-file-document-outline
+          href: https://paperless.judicial.life
+          description: Document management system
+          widget:
+            type: ping
+            url: https://paperless.judicial.life
+
+    # Third group for system tools
+    - group: System
+      items:
+        - name: ArgoCD
+          icon: mdi-kubernetes
+          href: https://argocd.judicial.life
+          description: Kubernetes GitOps
+          widget:
+            type: ping
+            url: https://argocd.judicial.life

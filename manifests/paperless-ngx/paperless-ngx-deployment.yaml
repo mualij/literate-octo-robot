@@ -1,0 +1,143 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: paperless-ngx-data-pvc
+  namespace: paperless-ngx
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: nfs-client
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: paperless-ngx-media-pvc
+  namespace: paperless-ngx
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: nfs-client
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: paperless-ngx-config
+  namespace: paperless-ngx
+data:
+  PAPERLESS_TIME_ZONE: "UTC"
+  PAPERLESS_CONSUMER_POLLING: "60"
+  PAPERLESS_OCR_LANGUAGE: "eng"
+  PAPERLESS_MEDIA_ROOT: "/media"
+  PAPERLESS_DATA_DIR: "/data"
+  PAPERLESS_URL: "https://paperless.judicial.life"  # Replace with your actual domain
+  PAPERLESS_REDIS: "redis://paperless-redis:6379"
+  # Add other Paperless-ngx configuration parameters as needed
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: paperless-ngx-secret
+  namespace: paperless-ngx
+type: Opaque
+stringData:
+  PAPERLESS_SECRET_KEY: "changeme-with-a-secure-key"  # Replace with a secure key
+  PAPERLESS_ADMIN_USER: "admin"
+  PAPERLESS_ADMIN_PASSWORD: "changeme"  # Replace with a secure password
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paperless-redis
+  namespace: paperless-ngx
+  labels:
+    app: paperless-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: paperless-redis
+  template:
+    metadata:
+      labels:
+        app: paperless-redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:6.0
+        ports:
+        - containerPort: 6379
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: paperless-redis
+  namespace: paperless-ngx
+spec:
+  selector:
+    app: paperless-redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paperless-ngx-deployment
+  namespace: paperless-ngx
+  labels:
+    app: paperless-ngx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: paperless-ngx
+  template:
+    metadata:
+      labels:
+        app: paperless-ngx
+    spec:
+      containers:
+      - name: paperless-ngx
+        image: ghcr.io/paperless-ngx/paperless-ngx:latest
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: paperless-ngx-config
+        - secretRef:
+            name: paperless-ngx-secret
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: media
+          mountPath: /media
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: paperless-ngx-data-pvc
+      - name: media
+        persistentVolumeClaim:
+          claimName: paperless-ngx-media-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: paperless-ngx-service
+  namespace: paperless-ngx
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: paperless.judicial.life
+spec:
+  selector:
+    app: paperless-ngx
+  ports:
+  - port: 8000
+    targetPort: 8000
+  type: ClusterIP

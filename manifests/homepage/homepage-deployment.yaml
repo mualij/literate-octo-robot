@@ -1,0 +1,79 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: homepage-config-pvc
+  namespace: homepage
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: nfs-client
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: homepage-deployment
+  namespace: homepage
+  labels:
+    app: homepage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: homepage
+  template:
+    metadata:
+      labels:
+        app: homepage
+    spec:
+      containers:
+      - name: homepage
+        image: ghcr.io/gethomepage/homepage:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: HOMEPAGE_VAR_TITLE
+          value: "Judicial.life Dashboard"
+        - name: HOMEPAGE_VAR_DISABLE_THEME_SWITCHER
+          value: "false"
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+        - name: homepage-config
+          mountPath: /app/config/settings.yaml
+          subPath: settings.yaml
+        - name: homepage-config
+          mountPath: /app/config/services.yaml
+          subPath: services.yaml
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+      volumes:
+      - name: config-volume
+        persistentVolumeClaim:
+          claimName: homepage-config-pvc
+      - name: homepage-config
+        configMap:
+          name: homepage-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: homepage-service
+  namespace: homepage
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: home.judicial.life
+spec:
+  selector:
+    app: homepage
+  ports:
+  - port: 3000
+    targetPort: 3000
+  type: ClusterIP
